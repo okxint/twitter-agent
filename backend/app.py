@@ -28,9 +28,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Twitter Agent API", version="1.0.0", lifespan=lifespan)
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Allow Vercel frontend in production
+vercel_url = os.environ.get("FRONTEND_URL")
+if vercel_url:
+    allowed_origins.append(vercel_url)
+
+# Also allow any *.vercel.app subdomain for preview deploys
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
