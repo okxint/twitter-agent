@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tweetagent-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: DB_PATH
+        value: /opt/render/project/src/data/agent.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-5
+      - key: TWEETS_PER_TOPIC
+        value: "3"
+    healthCheckPath: /api/health

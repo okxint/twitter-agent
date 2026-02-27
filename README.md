@@ -15,7 +15,9 @@
 
 <br />
 
-<img src="docs/hero-preview.png" alt="TweetAgent Dashboard" width="800" />
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/okxint/twitter-agent)
+
+<br />
 
 </div>
 
