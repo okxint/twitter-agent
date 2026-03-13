@@ -42,23 +42,27 @@ async def _post_tweet_to_twitter(tweet_id: int, content: str, user_id: int):
         logger.error(f"Error posting tweet {tweet_id}: {e}")
 
 
+def _tweet_to_dict(t):
+    return {
+        "id": t.id,
+        "topic": t.topic,
+        "content": t.content,
+        "status": t.status,
+        "created_at": str(t.created_at) if t.created_at else None,
+        "approved_at": str(t.approved_at) if t.approved_at else None,
+        "posted_at": str(t.posted_at) if t.posted_at else None,
+        "posted_tweet_id": t.posted_tweet_id,
+        "thread_id": t.thread_id,
+        "thread_position": t.thread_position,
+    }
+
+
 @router.get("/tweets/pending")
 async def get_pending_tweets(user_id: int = Depends(get_current_user_id)):
     from backend.app import db
 
     tweets = await db.get_pending_tweets(user_id=user_id)
-    return {
-        "tweets": [
-            {
-                "id": t.id,
-                "topic": t.topic,
-                "content": t.content,
-                "status": t.status,
-                "created_at": str(t.created_at) if t.created_at else None,
-            }
-            for t in tweets
-        ]
-    }
+    return {"tweets": [_tweet_to_dict(t) for t in tweets]}
 
 
 @router.get("/tweets/history")
@@ -68,21 +72,7 @@ async def get_tweet_history(
     from backend.app import db
 
     tweets = await db.get_tweet_history(user_id, limit=limit)
-    return {
-        "tweets": [
-            {
-                "id": t.id,
-                "topic": t.topic,
-                "content": t.content,
-                "status": t.status,
-                "created_at": str(t.created_at) if t.created_at else None,
-                "approved_at": str(t.approved_at) if t.approved_at else None,
-                "posted_at": str(t.posted_at) if t.posted_at else None,
-                "posted_tweet_id": t.posted_tweet_id,
-            }
-            for t in tweets
-        ]
-    }
+    return {"tweets": [_tweet_to_dict(t) for t in tweets]}
 
 
 @router.post("/tweets/{tweet_id}/approve")
@@ -128,6 +118,40 @@ async def reject_tweet(tweet_id: int, user_id: int = Depends(get_current_user_id
 
     await db.update_tweet_status(tweet_id, "rejected")
     return {"status": "rejected", "tweet_id": tweet_id}
+
+
+@router.post("/tweets/thread/{thread_id}/approve")
+async def approve_thread(
+    thread_id: str,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(get_current_user_id),
+):
+    from backend.app import db
+
+    tweets = await db.get_thread_tweets(thread_id)
+    if not tweets:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    if tweets[0].user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not your thread")
+
+    approved_count = 0
+    for tweet in tweets:
+        if tweet.status in ("pending", "edited"):
+            await db.update_tweet_status(tweet.id, "approved")
+            approved_count += 1
+
+    # Post first tweet (thread posting via API would need reply chains)
+    user = await db.get_user_by_id(user_id)
+    if user and user.twitter_api_key and user.twitter_access_token:
+        for tweet in tweets:
+            background_tasks.add_task(_post_tweet_to_twitter, tweet.id, tweet.content, user_id)
+
+    return {
+        "status": "approved",
+        "thread_id": thread_id,
+        "approved_count": approved_count,
+        "message": f"Approved {approved_count} tweets in thread",
+    }
 
 
 @router.post("/tweets/{tweet_id}/edit")

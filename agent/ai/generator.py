@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from typing import List
 
 import anthropic
@@ -32,6 +33,29 @@ class ContentGenerator:
         self.config = config
         self.client = anthropic.Anthropic(api_key=config.api_key)
 
+    def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
+        """Re-pass a tweet through Claude to make it sound more natural."""
+        try:
+            response = self.client.messages.create(
+                model=self.config.model,
+                max_tokens=400,
+                temperature=0.8,
+                system=(
+                    "Rewrite this tweet to sound like a real person wrote it. "
+                    "Remove any AI-sounding phrases, corporate speak, or filler. "
+                    f"Keep the core message and match this tone: {tone}. "
+                    "Keep under 280 chars. Return ONLY the rewritten tweet, nothing else."
+                ),
+                messages=[{"role": "user", "content": tweet_text}],
+            )
+            result = response.content[0].text.strip().strip('"')
+            if len(result) > 280:
+                result = result[:277] + "..."
+            return result
+        except anthropic.APIError as e:
+            logger.warning(f"Humanize failed, using original: {e}")
+            return tweet_text
+
     def generate_tweets(
         self,
         topic: str,
@@ -39,6 +63,7 @@ class ContentGenerator:
         tone: str = "neutral",
         hashtags: List[str] = None,
         count: int = 3,
+        humanize: bool = True,
     ) -> List[GeneratedTweet]:
         """Analyze top Reddit posts and generate original tweet content."""
         if not top_posts:
@@ -80,6 +105,8 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
             for text in tweet_texts[:count]:
                 if len(text) > 280:
                     text = text[:277] + "..."
+                if humanize:
+                    text = self.humanize_tweet(text, tone)
                 generated.append(
                     GeneratedTweet(
                         topic=topic,
@@ -93,6 +120,80 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
 
         except anthropic.APIError as e:
             logger.error(f"Claude API error: {e}")
+            return []
+
+    def generate_thread(
+        self,
+        topic: str,
+        top_posts: List[ScrapedPost],
+        tone: str = "neutral",
+        hashtags: List[str] = None,
+        thread_length: int = 4,
+        humanize: bool = True,
+    ) -> List[GeneratedTweet]:
+        """Generate a multi-tweet thread from Reddit discussions."""
+        if not top_posts:
+            logger.warning(f"No posts to analyze for topic: {topic}")
+            return []
+
+        posts_context = self._format_posts_for_analysis(top_posts)
+        hashtag_str = ", ".join(hashtags) if hashtags else "none"
+
+        user_prompt = f"""Topic: {topic}
+Tone: {tone}
+Hashtags to optionally include: {hashtag_str}
+Thread length: {thread_length} tweets
+
+Here are trending Reddit discussions for this topic:
+
+{posts_context}
+
+Create a Twitter thread of {thread_length} tweets about the most interesting insight from these discussions.
+- First tweet is the hook (grab attention)
+- Middle tweets develop the argument with specifics
+- Last tweet is the takeaway or CTA
+- Each tweet MUST be under 280 characters
+- Number them like "1/" "2/" etc at the start
+
+Return ONLY a JSON array of strings in thread order. Example:
+["1/ Hook tweet here", "2/ Development here", "3/ More detail", "4/ Takeaway"]"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.config.model,
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+
+            response_text = response.content[0].text
+            tweet_texts = self._parse_response(response_text)
+
+            inspiration_ids = [p.id for p in top_posts[:10] if p.id]
+            thread_id = str(uuid.uuid4())[:8]
+
+            generated = []
+            for i, text in enumerate(tweet_texts[:thread_length]):
+                if len(text) > 280:
+                    text = text[:277] + "..."
+                if humanize:
+                    text = self.humanize_tweet(text, tone)
+                generated.append(
+                    GeneratedTweet(
+                        topic=topic,
+                        content=text,
+                        inspiration_post_ids=inspiration_ids,
+                        thread_id=thread_id,
+                        thread_position=i + 1,
+                    )
+                )
+
+            logger.info(f"Generated thread ({len(generated)} tweets) for topic: {topic}")
+            return generated
+
+        except anthropic.APIError as e:
+            logger.error(f"Claude API error generating thread: {e}")
             return []
 
     def _format_posts_for_analysis(self, posts: List[ScrapedPost]) -> str:

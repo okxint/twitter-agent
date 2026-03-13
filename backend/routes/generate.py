@@ -12,7 +12,11 @@ router = APIRouter(tags=["generate"])
 
 
 @router.post("/generate")
-async def trigger_generation(user_id: int = Depends(get_current_user_id)):
+async def trigger_generation(
+    humanize: bool = True,
+    thread_mode: bool = False,
+    user_id: int = Depends(get_current_user_id),
+):
     from backend.app import db
 
     user = await db.get_user_by_id(user_id)
@@ -52,20 +56,31 @@ async def trigger_generation(user_id: int = Depends(get_current_user_id)):
             logger.warning(f"No scraped posts for topic: {topic_name}")
             continue
 
-        generated = generator.generate_tweets(
-            topic=topic_name,
-            top_posts=top_posts,
-            tone=tone,
-            hashtags=hashtags,
-            count=claude_config.tweets_to_generate,
-        )
+        if thread_mode:
+            generated = generator.generate_thread(
+                topic=topic_name,
+                top_posts=top_posts,
+                tone=tone,
+                hashtags=hashtags,
+                humanize=humanize,
+            )
+        else:
+            generated = generator.generate_tweets(
+                topic=topic_name,
+                top_posts=top_posts,
+                tone=tone,
+                hashtags=hashtags,
+                count=claude_config.tweets_to_generate,
+                humanize=humanize,
+            )
 
         for tweet in generated:
             tweet.user_id = user.id
             await db.save_generated_tweet(tweet)
             total_generated += 1
 
+    mode_label = "thread tweets" if thread_mode else "tweets"
     return {
         "generated": total_generated,
-        "message": f"Generated {total_generated} tweets across {len(topics)} topics",
+        "message": f"Generated {total_generated} {mode_label} across {len(topics)} topics",
     }

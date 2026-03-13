@@ -11,8 +11,10 @@ async def get_dashboard(user_id: int = Depends(get_current_user_id)):
 
     user = await db.get_user_by_id(user_id)
     stats = await db.get_dashboard_stats(user_id)
+    analytics = await db.get_analytics(user_id)
 
     return {
         "stats": stats,
         "topics_count": len(user.topics) if user else 0,
+        "analytics": analytics,
     }

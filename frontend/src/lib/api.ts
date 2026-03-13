@@ -134,14 +134,31 @@ export async function editTweet(tweetId: number, content: string) {
 
 // Dashboard
 export async function getDashboard() {
-  return request<{ stats: { pending: number; posted: number; total_generated: number }; topics_count: number }>(
-    "/dashboard"
-  );
+  return request<{
+    stats: { pending: number; posted: number; total_generated: number };
+    topics_count: number;
+    analytics: {
+      tweets_by_topic: Record<string, number>;
+      tweets_by_day: Record<string, number>;
+      approval_rate: number;
+    };
+  }>("/dashboard");
 }
 
 // Generate
-export async function triggerGeneration() {
-  return request<{ generated: number; message: string }>("/generate", {
+export async function triggerGeneration(options?: { humanize?: boolean; thread_mode?: boolean }) {
+  const params = new URLSearchParams();
+  if (options?.humanize !== undefined) params.set("humanize", String(options.humanize));
+  if (options?.thread_mode !== undefined) params.set("thread_mode", String(options.thread_mode));
+  const qs = params.toString();
+  return request<{ generated: number; message: string }>(`/generate${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+  });
+}
+
+// Thread
+export async function approveThread(threadId: string) {
+  return request<{ status: string; approved_count: number }>(`/tweets/thread/${threadId}/approve`, {
     method: "POST",
   });
 }

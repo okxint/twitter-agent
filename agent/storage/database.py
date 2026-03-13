@@ -79,6 +79,11 @@ CREATE INDEX IF NOT EXISTS idx_generated_user ON generated_tweets(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
 """
 
+MIGRATIONS = [
+    "ALTER TABLE generated_tweets ADD COLUMN thread_id TEXT DEFAULT NULL",
+    "ALTER TABLE generated_tweets ADD COLUMN thread_position INTEGER DEFAULT 0",
+]
+
 
 class Database:
     def __init__(self, db_path: str = "./data/agent.db"):
@@ -91,6 +96,12 @@ class Database:
         self._db.row_factory = aiosqlite.Row
         await self._db.executescript(SCHEMA)
         await self._db.commit()
+        for migration in MIGRATIONS:
+            try:
+                await self._db.execute(migration)
+                await self._db.commit()
+            except Exception:
+                pass  # column already exists
         logger.info(f"Database initialized at {self.db_path}")
 
     async def close(self):
@@ -292,11 +303,12 @@ class Database:
         cursor = await self._db.execute(
             """INSERT INTO generated_tweets
                (user_id, topic, content, inspiration_post_ids, status,
-                telegram_message_id, telegram_chat_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                telegram_message_id, telegram_chat_id, thread_id, thread_position)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (tweet.user_id, tweet.topic, tweet.content,
              tweet.inspiration_ids_json, tweet.status,
-             tweet.telegram_message_id, tweet.telegram_chat_id),
+             tweet.telegram_message_id, tweet.telegram_chat_id,
+             tweet.thread_id, tweet.thread_position),
         )
         await self._db.commit()
         return cursor.lastrowid
@@ -363,7 +375,54 @@ class Database:
             approved_at=row["approved_at"],
             posted_at=row["posted_at"],
             posted_tweet_id=row["posted_tweet_id"],
+            thread_id=row["thread_id"] if "thread_id" in row.keys() else None,
+            thread_position=row["thread_position"] if "thread_position" in row.keys() else 0,
         )
+
+    async def get_thread_tweets(self, thread_id: str) -> List[GeneratedTweet]:
+        cursor = await self._db.execute(
+            "SELECT * FROM generated_tweets WHERE thread_id = ? ORDER BY thread_position",
+            (thread_id,),
+        )
+        rows = await cursor.fetchall()
+        return [self._row_to_generated_tweet(row) for row in rows]
+
+    async def get_analytics(self, user_id: int) -> dict:
+        # Tweets by topic
+        cursor = await self._db.execute(
+            "SELECT topic, COUNT(*) as c FROM generated_tweets WHERE user_id = ? GROUP BY topic ORDER BY c DESC",
+            (user_id,),
+        )
+        by_topic = {row["topic"]: row["c"] for row in await cursor.fetchall()}
+
+        # Tweets by day (last 7 days)
+        cursor = await self._db.execute(
+            """SELECT DATE(created_at) as day, COUNT(*) as c
+               FROM generated_tweets WHERE user_id = ?
+               AND created_at >= DATE('now', '-7 days')
+               GROUP BY DATE(created_at) ORDER BY day""",
+            (user_id,),
+        )
+        by_day = {row["day"]: row["c"] for row in await cursor.fetchall()}
+
+        # Approval rate
+        total = await self._db.execute(
+            "SELECT COUNT(*) as c FROM generated_tweets WHERE user_id = ? AND status != 'pending'",
+            (user_id,),
+        )
+        total_count = (await total.fetchone())["c"]
+        approved = await self._db.execute(
+            "SELECT COUNT(*) as c FROM generated_tweets WHERE user_id = ? AND status IN ('approved', 'posted')",
+            (user_id,),
+        )
+        approved_count = (await approved.fetchone())["c"]
+        approval_rate = round((approved_count / total_count * 100) if total_count > 0 else 0, 1)
+
+        return {
+            "tweets_by_topic": by_topic,
+            "tweets_by_day": by_day,
+            "approval_rate": approval_rate,
+        }
 
     # --- Run Log ---
 

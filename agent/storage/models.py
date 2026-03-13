@@ -53,6 +53,8 @@ class GeneratedTweet:
     approved_at: Optional[datetime] = None
     posted_at: Optional[datetime] = None
     posted_tweet_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    thread_position: int = 0
     id: Optional[int] = None
 
     @property

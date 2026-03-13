@@ -1,8 +1,33 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
+  --bg: #ffffff;
+  --bg-secondary: #f9fafb;
+  --text: #111827;
+  --text-secondary: #6b7280;
+  --border: #f3f4f6;
+  --card-bg: #ffffff;
+  --card-border: #f3f4f6;
+  --nav-bg: rgba(255, 255, 255, 0.8);
+  --accent: #6366f1;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --bg: #0f172a;
+  --bg-secondary: #1e293b;
+  --text: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border: #1e293b;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --nav-bg: rgba(15, 23, 42, 0.8);
+  --accent: #818cf8;
 }
 
 @theme inline {
@@ -23,7 +48,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Animations */
+/* ─── Animations ─── */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -45,30 +70,10 @@ html {
   50% { transform: translateY(-10px); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
-}
-
-@keyframes gradient-shift {
+@keyframes gradient-text-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
-}
-
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-40px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(40px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes count-up {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 .animate-fade-in-up {
@@ -83,37 +88,14 @@ html {
   animation: float 3s ease-in-out infinite;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 3s ease infinite;
-}
-
-.animate-slide-in-left {
-  animation: slide-in-left 0.6s ease-out forwards;
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.6s ease-out forwards;
-}
-
-.animate-count-up {
-  animation: count-up 0.5s ease-out forwards;
-}
-
 /* Delay utilities */
 .delay-100 { animation-delay: 0.1s; opacity: 0; }
 .delay-200 { animation-delay: 0.2s; opacity: 0; }
 .delay-300 { animation-delay: 0.3s; opacity: 0; }
 .delay-400 { animation-delay: 0.4s; opacity: 0; }
 .delay-500 { animation-delay: 0.5s; opacity: 0; }
-.delay-600 { animation-delay: 0.6s; opacity: 0; }
-.delay-700 { animation-delay: 0.7s; opacity: 0; }
 
-/* Glass effect */
+/* Glass effect (light) */
 .glass {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
@@ -129,15 +111,17 @@ html {
   background-clip: text;
 }
 
-/* Hero gradient text — wider range */
+/* Hero gradient text — animated shifting */
 .gradient-text-hero {
-  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 50%, #34d399 100%);
+  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 25%, #34d399 50%, #8b5cf6 75%, #06b6d4 100%);
+  background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: gradient-text-shift 6s ease infinite;
 }
 
-/* Dark glass effect */
+/* ─── Dark glass effect (nav - legacy, kept for other components) ─── */
 .glass-dark {
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(16px);
@@ -145,101 +129,30 @@ html {
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
-/* Glow border on hover */
-.glow-card {
-  position: relative;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  transition: all 0.4s ease;
-}
-.glow-card::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #8b5cf6, #06b6d4, #34d399);
-  opacity: 0;
-  z-index: -1;
-  transition: opacity 0.4s ease;
-}
-.glow-card:hover::before {
-  opacity: 1;
-}
-.glow-card:hover {
-  border-color: transparent;
-  box-shadow: 0 0 30px rgba(139, 92, 246, 0.15), 0 0 60px rgba(6, 182, 212, 0.1);
+/* ─── Glass card (kept for dashboard/app pages) ─── */
+.glass-card {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Animated glow border (always on) */
-.glow-border-animated {
-  position: relative;
-}
-.glow-border-animated::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #8b5cf6, #06b6d4, #34d399, #8b5cf6);
-  background-size: 300% 300%;
-  animation: gradient-shift 4s ease infinite;
-  z-index: -1;
+.glass-card:hover {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(148, 163, 184, 0.15);
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(139, 92, 246, 0.08);
 }
 
-/* Shimmer effect for buttons */
-.shimmer {
-  position: relative;
-  overflow: hidden;
+/* ─── Tweet card hover ─── */
+.tweet-card {
+  transition: all 0.3s ease;
 }
-.shimmer::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  animation: shimmer-slide 3s ease-in-out infinite;
-}
-
-@keyframes shimmer-slide {
-  0% { left: -100%; }
-  100% { left: 200%; }
-}
-
-/* Gradient mesh background */
-.gradient-mesh {
-  background-color: #020617;
-  background-image:
-    radial-gradient(at 20% 20%, rgba(139, 92, 246, 0.25) 0px, transparent 50%),
-    radial-gradient(at 80% 20%, rgba(6, 182, 212, 0.2) 0px, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(52, 211, 153, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
-}
-
-/* Connecting pipeline line */
-@keyframes line-flow {
-  0% { background-position: 0% 0%; }
-  100% { background-position: 200% 0%; }
-}
-
-.pipeline-line {
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(139, 92, 246, 0.5) 0px,
-    rgba(6, 182, 212, 0.5) 30px,
-    rgba(52, 211, 153, 0.5) 60px,
-    rgba(139, 92, 246, 0.5) 90px
-  );
-  background-size: 200% 100%;
-  animation: line-flow 3s linear infinite;
-}
-
-/* Noise texture overlay */
-.noise-bg::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
+.tweet-card:hover {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  transform: translateX(4px);
 }
