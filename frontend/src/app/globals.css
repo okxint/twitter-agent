@@ -13,20 +13,20 @@
   --card-bg: #ffffff;
   --card-border: #f3f4f6;
   --nav-bg: rgba(255, 255, 255, 0.8);
-  --accent: #4f46e5;
+  --accent: #6366f1;
 }
 
 .dark {
-  --background: #020617;
+  --background: #0f172a;
   --foreground: #f1f5f9;
-  --bg: #020617;
-  --bg-secondary: #0f172a;
+  --bg: #0f172a;
+  --bg-secondary: #1e293b;
   --text: #f1f5f9;
   --text-secondary: #94a3b8;
   --border: #1e293b;
-  --card-bg: #0f172a;
-  --card-border: #1e293b;
-  --nav-bg: rgba(2, 6, 23, 0.8);
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --nav-bg: rgba(15, 23, 42, 0.8);
   --accent: #818cf8;
 }
 
@@ -52,7 +52,7 @@ html {
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
@@ -65,23 +65,37 @@ html {
   to { opacity: 1; }
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes gradient-text-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .animate-fade-in-up {
-  animation: fade-in-up 0.6s ease-out forwards;
+  animation: fade-in-up 0.7s ease-out forwards;
 }
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
 }
 
-/* Gradient text (simple, static — for logo or accents) */
-.gradient-text {
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
-/* ─── Glass effects (kept for dashboard/app pages) ─── */
+/* Delay utilities */
+.delay-100 { animation-delay: 0.1s; opacity: 0; }
+.delay-200 { animation-delay: 0.2s; opacity: 0; }
+.delay-300 { animation-delay: 0.3s; opacity: 0; }
+.delay-400 { animation-delay: 0.4s; opacity: 0; }
+.delay-500 { animation-delay: 0.5s; opacity: 0; }
+
+/* Glass effect (light) */
 .glass {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
@@ -89,6 +103,25 @@ html {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hero gradient text — animated shifting */
+.gradient-text-hero {
+  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 25%, #34d399 50%, #8b5cf6 75%, #06b6d4 100%);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-text-shift 6s ease infinite;
+}
+
+/* ─── Dark glass effect (nav - legacy, kept for other components) ─── */
 .glass-dark {
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(16px);
@@ -96,15 +129,30 @@ html {
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
+/* ─── Glass card (kept for dashboard/app pages) ─── */
 .glass-card {
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(148, 163, 184, 0.08);
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
   background: rgba(15, 23, 42, 0.6);
   border-color: rgba(148, 163, 184, 0.15);
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(139, 92, 246, 0.08);
+}
+
+/* ─── Tweet card hover ─── */
+.tweet-card {
+  transition: all 0.3s ease;
+}
+.tweet-card:hover {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  transform: translateX(4px);
 }
