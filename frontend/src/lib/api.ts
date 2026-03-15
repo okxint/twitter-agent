@@ -81,6 +81,18 @@ export async function getMe() {
   }>("/me");
 }
 
+// OAuth
+export async function getOAuthUrl(provider: "github" | "google", redirectUri: string) {
+  return request<{ url: string }>(`/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+}
+
+export async function oauthCallback(provider: "github" | "google", code: string, redirectUri: string) {
+  return request<{ token: string; user_id: number; email: string }>(
+    `/oauth/${provider}/callback`,
+    { method: "POST", body: JSON.stringify({ code, redirect_uri: redirectUri }) }
+  );
+}
+
 // Topics
 export async function getTopics() {
   return request<{ topics: any[] }>("/topics");
