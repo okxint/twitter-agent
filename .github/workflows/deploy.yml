@@ -20,6 +20,8 @@ jobs:
       - name: Build
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: https://tweetagent-api.onrender.com/api
 
       - name: Deploy
         id: deploy
