@@ -1,3 +1,4 @@
+import os
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -9,11 +10,15 @@ logger = logging.getLogger("twitter_agent")
 
 router = APIRouter(tags=["scrape"])
 
+# App-level Reddit credentials (users don't need their own)
+REDDIT_CLIENT_ID = os.environ.get("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET = os.environ.get("REDDIT_CLIENT_SECRET", "")
+
 # Track scrape status per user
 _scrape_status: dict = {}
 
 
-async def _run_scrape(user_id: int, reddit_client_id: str, reddit_client_secret: str, topics: list):
+async def _run_scrape(user_id: int, topics: list):
     """Background task: fetch top Reddit posts for a user's topics."""
     from backend.app import db
 
@@ -24,8 +29,8 @@ async def _run_scrape(user_id: int, reddit_client_id: str, reddit_client_secret:
 
     try:
         fetcher = RedditFetcher(
-            client_id=reddit_client_id,
-            client_secret=reddit_client_secret,
+            client_id=REDDIT_CLIENT_ID,
+            client_secret=REDDIT_CLIENT_SECRET,
         )
 
         for topic_data in topics:
@@ -79,6 +84,12 @@ async def trigger_scrape(
 ):
     from backend.app import db
 
+    if not REDDIT_CLIENT_ID or not REDDIT_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="Reddit scraping is not configured on this server.",
+        )
+
     # Check if already running
     status = _scrape_status.get(user_id, {})
     if status.get("running"):
@@ -87,12 +98,6 @@ async def trigger_scrape(
     user = await db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    if not user.reddit_client_id or not user.reddit_client_secret:
-        raise HTTPException(
-            status_code=400,
-            detail="Reddit API credentials not set. Go to Settings to add them.",
-        )
 
     topics = user.topics
     if not topics:
@@ -109,8 +114,6 @@ async def trigger_scrape(
     background_tasks.add_task(
         _run_scrape,
         user_id=user.id,
-        reddit_client_id=user.reddit_client_id,
-        reddit_client_secret=user.reddit_client_secret,
         topics=topics,
     )
 
