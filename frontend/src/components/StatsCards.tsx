@@ -10,7 +10,7 @@ interface StatsCardsProps {
 const cards = [
   {
     key: "pending",
-    label: "Pending Review",
+    label: "Ready to Use",
     gradient: "from-amber-500 to-orange-500",
     bgLight: "bg-amber-50 dark:bg-amber-500/10",
     icon: (
@@ -21,7 +21,7 @@ const cards = [
   },
   {
     key: "posted",
-    label: "Posted",
+    label: "Saved",
     gradient: "from-green-500 to-emerald-500",
     bgLight: "bg-green-50 dark:bg-green-500/10",
     icon: (

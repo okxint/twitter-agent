@@ -323,7 +323,7 @@ export default function DashboardPage() {
       <div className="mt-10">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-            Pending Review
+            Your Tweets
             {tweets.length > 0 && (
               <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-bold">
                 {tweets.length}
@@ -338,9 +338,9 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
               </svg>
             </div>
-            <p className="text-gray-500 dark:text-slate-400 font-medium">No pending tweets</p>
+            <p className="text-gray-500 dark:text-slate-400 font-medium">No tweets yet</p>
             <p className="mt-2 text-sm text-gray-400 dark:text-slate-500 max-w-sm mx-auto leading-relaxed">
-              Add topics, scrape trending content, then generate AI-powered tweets to review here.
+              1. Add topics  2. Hit "Scrape Reddit"  3. Hit "Generate Tweets"  — then copy your favorites!
             </p>
           </div>
         ) : (

@@ -33,7 +33,7 @@ export default function RegisterPage() {
         password: form.password,
       });
       setToken(res.token);
-      router.push("/dashboard/settings");
+      router.push("/dashboard/topics");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -149,8 +149,8 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl p-3 border border-indigo-100 dark:border-indigo-800">
-            <p className="text-xs text-indigo-600 font-medium text-center">
-              After signing up, add your Reddit &amp; Twitter API keys in Settings to get started.
+            <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium text-center">
+              After signing up, pick your topics and start generating viral tweets instantly.
             </p>
           </div>
         </div>
