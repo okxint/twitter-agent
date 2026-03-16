@@ -19,8 +19,4 @@ services:
         value: "3"
       - key: FRONTEND_URL
         value: https://tweetagent.vercel.app
-      - key: REDDIT_CLIENT_ID
-        sync: false
-      - key: REDDIT_CLIENT_SECRET
-        sync: false
     healthCheckPath: /api/health

@@ -1,23 +1,38 @@
 import logging
+import time
 from typing import List
 
-import praw
+import httpx
 
 from agent.storage.models import ScrapedPost
 
 logger = logging.getLogger("twitter_agent")
 
+REDDIT_BASE = "https://www.reddit.com"
+USER_AGENT = "TweetAgent/1.0 (by /u/tweetagent)"
+
 
 class RedditFetcher:
-    """Fetches top posts from Reddit using PRAW (read-only mode)."""
+    """Fetches top posts from Reddit using public JSON endpoints (no API keys needed)."""
 
-    def __init__(self, client_id: str, client_secret: str, user_agent: str = "TweetAgent/1.0"):
-        self.reddit = praw.Reddit(
-            client_id=client_id,
-            client_secret=client_secret,
-            user_agent=user_agent,
-        )
-        self.reddit.read_only = True
+    def __init__(self, **kwargs):
+        # Accept but ignore client_id/client_secret for backward compat
+        self._last_request = 0.0
+
+    def _rate_limit(self):
+        """Respect ~10 req/min rate limit (6 seconds between requests)."""
+        elapsed = time.time() - self._last_request
+        if elapsed < 6:
+            time.sleep(6 - elapsed)
+        self._last_request = time.time()
+
+    def _get_json(self, url: str) -> dict:
+        """Fetch JSON from Reddit public endpoint."""
+        self._rate_limit()
+        headers = {"User-Agent": USER_AGENT}
+        resp = httpx.get(url, headers=headers, timeout=15, follow_redirects=True)
+        resp.raise_for_status()
+        return resp.json()
 
     def fetch_top_posts(
         self,
@@ -30,26 +45,35 @@ class RedditFetcher:
         """Fetch top posts from a subreddit with their top comments."""
         posts = []
         try:
-            subreddit = self.reddit.subreddit(subreddit_name)
-            for submission in subreddit.top(time_filter=time_filter, limit=limit):
-                # Get top comments
-                submission.comment_sort = "best"
-                submission.comments.replace_more(limit=0)
+            url = f"{REDDIT_BASE}/r/{subreddit_name}/top.json?t={time_filter}&limit={limit}"
+            data = self._get_json(url)
+
+            for child in data.get("data", {}).get("children", []):
+                post_data = child.get("data", {})
+
+                # Fetch top comments
                 top_comments = []
-                for comment in submission.comments[:comments_per_post]:
-                    if hasattr(comment, "body") and comment.body:
-                        top_comments.append(comment.body[:500])
+                try:
+                    comments_url = f"{REDDIT_BASE}{post_data['permalink']}.json?limit={comments_per_post}&sort=best"
+                    comments_data = self._get_json(comments_url)
+                    if len(comments_data) > 1:
+                        for comment_child in comments_data[1].get("data", {}).get("children", [])[:comments_per_post]:
+                            body = comment_child.get("data", {}).get("body", "")
+                            if body:
+                                top_comments.append(body[:500])
+                except Exception as e:
+                    logger.warning(f"Failed to fetch comments for {post_data.get('id')}: {e}")
 
                 post = ScrapedPost(
-                    post_id=submission.id,
+                    post_id=post_data.get("id", ""),
                     subreddit=subreddit_name,
-                    author=str(submission.author) if submission.author else "[deleted]",
-                    title=submission.title,
-                    content=submission.selftext[:2000] if submission.selftext else "",
-                    score=submission.score,
-                    num_comments=submission.num_comments,
-                    upvote_ratio=submission.upvote_ratio,
-                    post_url=f"https://reddit.com{submission.permalink}",
+                    author=post_data.get("author", "[deleted]"),
+                    title=post_data.get("title", ""),
+                    content=(post_data.get("selftext", "") or "")[:2000],
+                    score=post_data.get("score", 0),
+                    num_comments=post_data.get("num_comments", 0),
+                    upvote_ratio=post_data.get("upvote_ratio", 0.0),
+                    post_url=f"https://reddit.com{post_data.get('permalink', '')}",
                     top_comments=top_comments,
                     topic=topic,
                 )

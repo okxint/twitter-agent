@@ -1,4 +1,3 @@
-import os
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -9,10 +8,6 @@ from agent.reddit.fetcher import RedditFetcher
 logger = logging.getLogger("twitter_agent")
 
 router = APIRouter(tags=["scrape"])
-
-# App-level Reddit credentials (users don't need their own)
-REDDIT_CLIENT_ID = os.environ.get("REDDIT_CLIENT_ID", "")
-REDDIT_CLIENT_SECRET = os.environ.get("REDDIT_CLIENT_SECRET", "")
 
 # Track scrape status per user
 _scrape_status: dict = {}
@@ -28,10 +23,7 @@ async def _run_scrape(user_id: int, topics: list):
     topics_processed = 0
 
     try:
-        fetcher = RedditFetcher(
-            client_id=REDDIT_CLIENT_ID,
-            client_secret=REDDIT_CLIENT_SECRET,
-        )
+        fetcher = RedditFetcher()
 
         for topic_data in topics:
             if isinstance(topic_data, dict):
@@ -83,12 +75,6 @@ async def trigger_scrape(
     user_id: int = Depends(get_current_user_id),
 ):
     from backend.app import db
-
-    if not REDDIT_CLIENT_ID or not REDDIT_CLIENT_SECRET:
-        raise HTTPException(
-            status_code=500,
-            detail="Reddit scraping is not configured on this server.",
-        )
 
     # Check if already running
     status = _scrape_status.get(user_id, {})
