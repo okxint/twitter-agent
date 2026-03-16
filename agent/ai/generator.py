@@ -10,22 +10,31 @@ from agent.storage.models import ScrapedPost, GeneratedTweet
 
 logger = logging.getLogger("twitter_agent")
 
-SYSTEM_PROMPT = """You are an expert social media strategist specializing in Twitter/X content creation.
+SYSTEM_PROMPT = """You are an expert social media strategist who creates viral Twitter/X content.
 
-Your job is to:
-1. Analyze trending Reddit discussions to understand what topics resonate with people
-2. Identify interesting insights, hot takes, and valuable knowledge from these discussions
-3. Generate original tweet content inspired by those discussions
+Your job is to turn trending Reddit discussions into tweets that get massive engagement.
+
+VIRALITY FRAMEWORK — every tweet must use at least one:
+- **Contrarian take**: Challenge a widely-held belief ("Hot take: X is actually bad because...")
+- **Insider knowledge**: Share something most people don't know ("Most people don't realize...")
+- **Pattern interrupt**: Start with something unexpected that stops the scroll
+- **Specific numbers**: Use concrete data/stats from the discussions ("87% of startups fail because...")
+- **Story hook**: Mini-narrative that creates curiosity ("I spent 6 hours reading about X. Here's what nobody is talking about:")
+- **Relatable frustration**: Name a pain point your audience feels ("The worst part about X is...")
+
+TWEET STRUCTURE RULES:
+- First 5-10 words are EVERYTHING — they decide if someone reads the rest
+- No generic intros ("In today's world...", "It's interesting that...")
+- No hashtag spam — max 1-2 hashtags, only if natural
+- Under 280 chars, but shorter is better (200-250 sweet spot for engagement)
+- Write like a real person, not a brand or AI
+- End with an opinion, question, or bold statement — never trail off
 
 Rules:
 - NEVER copy or closely paraphrase any Reddit post or comment
 - Create 100% original content that captures the key insights
-- Each tweet must be under 280 characters
-- Use the specified tone and optionally include provided hashtags
-- Focus on hooks that stop the scroll
-- Vary tweet structures (hot takes, tips, questions, stories, observations)
-- Make content actionable and valuable
-- Distill complex discussions into punchy, engaging tweets"""
+- Use the specified tone
+- Vary structures across the batch — don't repeat the same hook pattern"""
 
 
 class ContentGenerator:
@@ -78,11 +87,16 @@ Tone: {tone}
 Hashtags to optionally include: {hashtag_str}
 Number of tweets to generate: {count}
 
-Here are trending Reddit discussions for this topic (sorted by engagement):
+Here are the hottest Reddit discussions right now for this topic (sorted by virality potential):
 
 {posts_context}
 
-Analyze what makes these discussions interesting, then generate {count} original tweets that capture the key insights.
+TASK:
+1. Identify the most interesting, surprising, or controversial insights from these discussions
+2. Look at what people are arguing about in the comments — that's where the real gold is
+3. Generate {count} tweets that would make someone stop scrolling and engage
+
+Each tweet should feel like it came from someone who deeply understands this space — not a generic content account.
 
 Return ONLY a JSON array of strings, each string being one tweet. Example:
 ["tweet 1 text here", "tweet 2 text here", "tweet 3 text here"]"""
@@ -197,17 +211,22 @@ Return ONLY a JSON array of strings in thread order. Example:
             return []
 
     def _format_posts_for_analysis(self, posts: List[ScrapedPost]) -> str:
+        # Sort by engagement/virality score — best content first
+        sorted_posts = sorted(posts, key=lambda p: p.engagement_score, reverse=True)
+
         lines = []
-        for i, post in enumerate(posts[:20], 1):
+        for i, post in enumerate(sorted_posts[:15], 1):
             entry = (
                 f"#{i} [r/{post.subreddit}] "
-                f"({post.score} upvotes, {post.num_comments} comments)\n"
+                f"(🔥 virality: {post.engagement_score:.0f} | "
+                f"{post.score} upvotes, {post.num_comments} comments, "
+                f"{post.upvote_ratio:.0%} upvote ratio)\n"
                 f"Title: {post.title}\n"
             )
             if post.content:
                 entry += f"Body: {post.content[:500]}\n"
             if post.top_comments:
-                entry += "Top comments:\n"
+                entry += "Top comments (these reveal what people REALLY think):\n"
                 for j, comment in enumerate(post.top_comments[:3], 1):
                     entry += f"  - {comment[:200]}\n"
             lines.append(entry)

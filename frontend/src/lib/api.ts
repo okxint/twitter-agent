@@ -98,6 +98,10 @@ export async function getTopics() {
   return request<{ topics: any[] }>("/topics");
 }
 
+export async function suggestSubreddits(topic: string) {
+  return request<{ topic: string; subreddits: string[] }>(`/topics/suggest-subreddits?topic=${encodeURIComponent(topic)}`);
+}
+
 export async function addTopic(data: {
   name: string;
   subreddits?: string[];

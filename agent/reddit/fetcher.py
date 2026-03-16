@@ -5,6 +5,7 @@ from typing import List
 import httpx
 
 from agent.storage.models import ScrapedPost
+from agent.reddit.discover import score_post_virality
 
 logger = logging.getLogger("twitter_agent")
 
@@ -77,9 +78,12 @@ class RedditFetcher:
                     top_comments=top_comments,
                     topic=topic,
                 )
-                post.compute_engagement_score()
+                # Use virality score instead of basic engagement
+                post.engagement_score = score_post_virality(post_data)
                 posts.append(post)
 
+            # Sort by virality score, best content first
+            posts.sort(key=lambda p: p.engagement_score, reverse=True)
             logger.info(f"Fetched {len(posts)} posts from r/{subreddit_name}")
         except Exception as e:
             logger.error(f"Error fetching r/{subreddit_name}: {e}")

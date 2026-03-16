@@ -2,16 +2,17 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 from backend.routes.auth import get_current_user_id
+from agent.reddit.discover import discover_subreddits
 
 router = APIRouter(tags=["topics"])
 
 
 class AddTopicRequest(BaseModel):
     name: str
-    subreddits: List[str] = []
+    subreddits: List[str] = []  # optional — auto-discovered if empty
     tone: str = "informative"
     hashtags: List[str] = []
 
@@ -38,12 +39,23 @@ async def add_topic(req: AddTopicRequest, user_id: int = Depends(get_current_use
     topics = user.topics
     for t in topics:
         existing_name = t["name"] if isinstance(t, dict) else t
-        if existing_name == req.name:
+        if existing_name.lower() == req.name.lower():
             raise HTTPException(status_code=400, detail="Topic already exists")
+
+    # Auto-discover subreddits if none provided
+    subreddits = req.subreddits
+    if not subreddits:
+        subreddits = discover_subreddits(req.name)
+
+    if not subreddits:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Couldn't find relevant subreddits for '{req.name}'. Try a more specific topic or add subreddits manually.",
+        )
 
     topic_data = {
         "name": req.name,
-        "subreddits": req.subreddits,
+        "subreddits": subreddits,
         "tone": req.tone,
         "hashtags": req.hashtags,
     }
@@ -51,6 +63,16 @@ async def add_topic(req: AddTopicRequest, user_id: int = Depends(get_current_use
     await db.update_user_topics_by_id(user_id, json.dumps(topics))
 
     return {"topics": topics}
+
+
+@router.get("/topics/suggest-subreddits")
+async def suggest_subreddits(
+    topic: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Preview which subreddits would be auto-discovered for a topic."""
+    subs = discover_subreddits(topic)
+    return {"topic": topic, "subreddits": subs}
 
 
 @router.delete("/topics/{topic_name}")
