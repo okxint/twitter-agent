@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { addTopic, removeTopic, suggestSubreddits } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { addTopic, removeTopic, suggestSubreddits, getTopicCategories } from "@/lib/api";
 
 interface TopicManagerProps {
   topics: any[];
@@ -10,14 +10,22 @@ interface TopicManagerProps {
 
 export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
   const [name, setName] = useState("");
+  const [customSubs, setCustomSubs] = useState("");
+  const [showCustomSubs, setShowCustomSubs] = useState(false);
   const [tone, setTone] = useState("informative");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [suggestedSubs, setSuggestedSubs] = useState<string[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
-
-  // Debounced subreddit suggestion
+  const [categories, setCategories] = useState<Record<string, string[]>>({});
+  const [showPicker, setShowPicker] = useState(false);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    getTopicCategories()
+      .then((res) => setCategories(res.categories))
+      .catch(() => {});
+  }, []);
 
   const handleNameChange = (value: string) => {
     setName(value);
@@ -31,14 +39,17 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
         try {
           const res = await suggestSubreddits(value.trim());
           setSuggestedSubs(res.subreddits);
-        } catch {
-          // silent fail
-        } finally {
-          setLoadingSubs(false);
-        }
+        } catch {}
+        setLoadingSubs(false);
       }, 600);
       setDebounceTimer(timer);
     }
+  };
+
+  const selectFromPicker = (topicName: string) => {
+    setName(topicName);
+    setShowPicker(false);
+    handleNameChange(topicName);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -48,8 +59,14 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
     setLoading(true);
     setError("");
     try {
-      await addTopic({ name: name.trim(), tone });
+      const extraSubs = customSubs
+        .split(",")
+        .map((s) => s.trim().replace(/^r\//, ""))
+        .filter(Boolean);
+      await addTopic({ name: name.trim(), subreddits: extraSubs, tone });
       setName("");
+      setCustomSubs("");
+      setShowCustomSubs(false);
       setTone("informative");
       setSuggestedSubs([]);
       onUpdate();
@@ -81,6 +98,10 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
     { value: "provocative", label: "Provocative", icon: "🔥" },
   ];
 
+  const existingNames = new Set(
+    topics.map((t: any) => (typeof t === "string" ? t : t.name).toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       {/* Add topic form */}
@@ -92,20 +113,64 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
             </svg>
             Add Topic
           </h3>
-          <p className="text-indigo-100 text-sm mt-1">Just type what you want to tweet about. We'll find the best Reddit sources automatically.</p>
+          <p className="text-indigo-100 text-sm mt-1">Pick a topic or type your own. We'll find the best Reddit sources automatically.</p>
         </div>
         <form onSubmit={handleAdd} className="p-6">
           <div className="space-y-5">
+            {/* Topic input + browse button */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">What do you want to tweet about?</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="block w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all sm:text-sm bg-gray-50/50 dark:bg-gray-700/50"
-                placeholder="e.g., AI, Crypto, Startups, F1, Music..."
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  className="block flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all sm:text-sm bg-gray-50/50 dark:bg-gray-700/50"
+                  placeholder="e.g., AI, Crypto, Startups, F1..."
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(!showPicker)}
+                  className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all whitespace-nowrap"
+                >
+                  Browse Topics
+                </button>
+              </div>
+
+              {/* Topic category picker */}
+              {showPicker && Object.keys(categories).length > 0 && (
+                <div className="mt-3 border border-gray-200 dark:border-gray-600 rounded-xl p-4 max-h-80 overflow-y-auto bg-gray-50/50 dark:bg-gray-700/30">
+                  {Object.entries(categories).map(([group, topicList]) => (
+                    <div key={group} className="mb-4 last:mb-0">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{group}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {topicList.map((t) => {
+                          const isAdded = existingNames.has(t.toLowerCase());
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              disabled={isAdded}
+                              onClick={() => selectFromPicker(t)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                isAdded
+                                  ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 cursor-default border border-green-200 dark:border-green-800"
+                                  : name === t
+                                  ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-600"
+                                  : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                              }`}
+                            >
+                              {isAdded ? `✓ ${t}` : t}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Auto-discovered subreddits preview */}
               {loadingSubs && (
                 <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
@@ -130,6 +195,30 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
               )}
             </div>
 
+            {/* Optional: add custom subreddits */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowCustomSubs(!showCustomSubs)}
+                className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              >
+                {showCustomSubs ? "− Hide custom subreddits" : "+ Add specific subreddits (optional)"}
+              </button>
+              {showCustomSubs && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={customSubs}
+                    onChange={(e) => setCustomSubs(e.target.value)}
+                    className="block w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all sm:text-sm bg-gray-50/50 dark:bg-gray-700/50"
+                    placeholder="e.g., LocalLLaMA, StableDiffusion, ClaudeAI"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Comma-separated. These will be added alongside our auto-discovered ones.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Tone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Tweet tone</label>
               <div className="grid grid-cols-5 gap-2">
@@ -190,7 +279,7 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
               </svg>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">No topics yet. Add one above to start generating tweets.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No topics yet. Pick from the categories above or type your own.</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -200,18 +289,18 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
               const topicSubreddits = typeof t === "string" ? [] : (t.subreddits || []);
               return (
                 <div key={topicName} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
                       {topicName.charAt(0).toUpperCase()}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">{topicName}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-gray-400 capitalize">{topicTone}</span>
                         {topicSubreddits.length > 0 && (
                           <>
                             <span className="text-gray-300 dark:text-gray-600">·</span>
-                            <span className="text-xs text-gray-400">{topicSubreddits.map((s: string) => `r/${s}`).join(", ")}</span>
+                            <span className="text-xs text-gray-400 truncate">{topicSubreddits.map((s: string) => `r/${s}`).join(", ")}</span>
                           </>
                         )}
                       </div>
@@ -220,7 +309,7 @@ export default function TopicManager({ topics, onUpdate }: TopicManagerProps) {
                   <button
                     onClick={() => handleRemove(topicName)}
                     disabled={loading}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-all"
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-all shrink-0"
                     title="Remove topic"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

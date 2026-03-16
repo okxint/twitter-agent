@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from backend.routes.auth import get_current_user_id
-from agent.reddit.discover import discover_subreddits
+from agent.reddit.discover import discover_subreddits, get_all_topics, TOPIC_CATEGORIES
 
 router = APIRouter(tags=["topics"])
 
@@ -42,10 +42,15 @@ async def add_topic(req: AddTopicRequest, user_id: int = Depends(get_current_use
         if existing_name.lower() == req.name.lower():
             raise HTTPException(status_code=400, detail="Topic already exists")
 
-    # Auto-discover subreddits if none provided
-    subreddits = req.subreddits
-    if not subreddits:
-        subreddits = discover_subreddits(req.name)
+    # Auto-discover subreddits, then merge with any user-specified ones
+    auto_subs = discover_subreddits(req.name)
+    # Combine: user's custom subs + auto-discovered, deduplicated
+    seen = set()
+    subreddits = []
+    for s in req.subreddits + auto_subs:
+        if s.lower() not in seen:
+            seen.add(s.lower())
+            subreddits.append(s)
 
     if not subreddits:
         raise HTTPException(
@@ -73,6 +78,12 @@ async def suggest_subreddits(
     """Preview which subreddits would be auto-discovered for a topic."""
     subs = discover_subreddits(topic)
     return {"topic": topic, "subreddits": subs}
+
+
+@router.get("/topics/categories")
+async def list_categories():
+    """Return all available topic categories (Reddit-style interest picker)."""
+    return {"categories": get_all_topics()}
 
 
 @router.delete("/topics/{topic_name}")

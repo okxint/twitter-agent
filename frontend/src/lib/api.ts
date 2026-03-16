@@ -102,6 +102,10 @@ export async function suggestSubreddits(topic: string) {
   return request<{ topic: string; subreddits: string[] }>(`/topics/suggest-subreddits?topic=${encodeURIComponent(topic)}`);
 }
 
+export async function getTopicCategories() {
+  return request<{ categories: Record<string, string[]> }>("/topics/categories");
+}
+
 export async function addTopic(data: {
   name: string;
   subreddits?: string[];

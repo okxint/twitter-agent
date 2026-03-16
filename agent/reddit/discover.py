@@ -9,52 +9,150 @@ logger = logging.getLogger("twitter_agent")
 REDDIT_BASE = "https://www.reddit.com"
 USER_AGENT = "TweetAgent/1.0 (by /u/tweetagent)"
 
-# Curated high-quality subreddits per common topic
-# These are known active subs with good engagement
-TOPIC_SUBREDDIT_MAP: Dict[str, List[str]] = {
-    "ai": ["artificial", "MachineLearning", "LocalLLaMA", "ChatGPT", "singularity"],
-    "artificial intelligence": ["artificial", "MachineLearning", "LocalLLaMA", "ChatGPT", "singularity"],
-    "machine learning": ["MachineLearning", "deeplearning", "MLQuestions", "datascience", "artificial"],
-    "crypto": ["CryptoCurrency", "Bitcoin", "ethereum", "defi", "CryptoMarkets"],
-    "cryptocurrency": ["CryptoCurrency", "Bitcoin", "ethereum", "defi", "CryptoMarkets"],
-    "bitcoin": ["Bitcoin", "CryptoCurrency", "BitcoinMarkets", "CryptoMarkets"],
-    "ethereum": ["ethereum", "ethfinance", "ethdev", "CryptoCurrency"],
-    "defi": ["defi", "CryptoCurrency", "ethereum", "UniSwap"],
-    "web3": ["web3", "CryptoCurrency", "ethereum", "defi", "NFT"],
-    "nft": ["NFT", "NFTsMarketplace", "CryptoCurrency", "web3"],
-    "startups": ["startups", "Entrepreneur", "SaaS", "indiehackers", "smallbusiness"],
-    "entrepreneurship": ["Entrepreneur", "startups", "SaaS", "indiehackers", "smallbusiness"],
-    "saas": ["SaaS", "startups", "Entrepreneur", "indiehackers", "microsaas"],
-    "product management": ["ProductManagement", "product_design", "startups", "UserExperience"],
-    "programming": ["programming", "learnprogramming", "webdev", "coding", "compsci"],
-    "python": ["Python", "learnpython", "django", "flask", "FastAPI"],
-    "javascript": ["javascript", "reactjs", "node", "webdev", "nextjs"],
-    "react": ["reactjs", "nextjs", "webdev", "javascript", "frontend"],
-    "rust": ["rust", "programming", "learnrust"],
-    "golang": ["golang", "programming"],
-    "devops": ["devops", "kubernetes", "docker", "sysadmin", "aws"],
-    "cloud": ["aws", "googlecloud", "azure", "devops", "kubernetes"],
-    "cybersecurity": ["cybersecurity", "netsec", "hacking", "AskNetsec", "InfoSecNews"],
-    "data science": ["datascience", "MachineLearning", "statistics", "dataengineering", "analytics"],
-    "soccer": ["soccer", "PremierLeague", "football", "Bundesliga", "LaLiga"],
-    "football": ["soccer", "PremierLeague", "football", "nfl"],
-    "f1": ["formula1", "F1Technical", "MotorsportsReplays"],
-    "formula 1": ["formula1", "F1Technical", "MotorsportsReplays"],
-    "music": ["Music", "hiphopheads", "indieheads", "LetsTalkMusic", "listentothis"],
-    "gaming": ["gaming", "Games", "pcgaming", "truegaming", "IndieGaming"],
-    "fitness": ["Fitness", "bodyweightfitness", "running", "weightlifting", "GYM"],
-    "finance": ["finance", "investing", "StockMarket", "personalfinance", "wallstreetbets"],
-    "investing": ["investing", "StockMarket", "ValueInvesting", "stocks", "finance"],
-    "marketing": ["marketing", "digital_marketing", "SEO", "socialmedia", "ContentMarketing"],
-    "design": ["design", "graphic_design", "UI_Design", "web_design", "UXDesign"],
-    "science": ["science", "askscience", "EverythingScience", "Futurology"],
-    "technology": ["technology", "tech", "Futurology", "gadgets", "TechNewsToday"],
-    "business": ["business", "Entrepreneur", "startups", "smallbusiness", "strategy"],
-    "health": ["Health", "nutrition", "Fitness", "MedicalNews", "HealthyFood"],
-    "climate": ["climate", "environment", "ClimateActionPlan", "energy", "renewableenergy"],
-    "space": ["space", "SpaceX", "NASA", "Astronomy", "astrophysics"],
-    "robotics": ["robotics", "artificial", "engineering", "Automate"],
+# Reddit-style interest categories with curated subreddits
+# Organized like Reddit's signup flow
+TOPIC_CATEGORIES: Dict[str, List[str]] = {
+    # Technology & Internet
+    "Artificial Intelligence": ["artificial", "MachineLearning", "LocalLLaMA", "ChatGPT", "singularity"],
+    "Machine Learning": ["MachineLearning", "deeplearning", "MLQuestions", "datascience", "artificial"],
+    "Programming": ["programming", "learnprogramming", "webdev", "coding", "compsci"],
+    "Python": ["Python", "learnpython", "django", "flask", "FastAPI"],
+    "JavaScript": ["javascript", "reactjs", "node", "webdev", "nextjs"],
+    "Web Development": ["webdev", "Frontend", "reactjs", "nextjs", "css"],
+    "Cybersecurity": ["cybersecurity", "netsec", "hacking", "AskNetsec", "InfoSecNews"],
+    "Data Science": ["datascience", "MachineLearning", "statistics", "dataengineering", "analytics"],
+    "DevOps": ["devops", "kubernetes", "docker", "sysadmin", "aws"],
+    "Cloud Computing": ["aws", "googlecloud", "azure", "devops", "kubernetes"],
+    "Open Source": ["opensource", "linux", "selfhosted", "programming", "FOSS"],
+    "Tech News": ["technology", "tech", "Futurology", "gadgets", "TechNewsToday"],
+    "Robotics": ["robotics", "artificial", "engineering", "Automate"],
+    "Mobile Development": ["androiddev", "iOSProgramming", "FlutterDev", "reactnative", "SwiftUI"],
+    # Crypto & Finance
+    "Cryptocurrency": ["CryptoCurrency", "Bitcoin", "ethereum", "defi", "CryptoMarkets"],
+    "Bitcoin": ["Bitcoin", "CryptoCurrency", "BitcoinMarkets", "CryptoMarkets"],
+    "Ethereum": ["ethereum", "ethfinance", "ethdev", "CryptoCurrency"],
+    "DeFi": ["defi", "CryptoCurrency", "ethereum", "UniSwap"],
+    "Web3": ["web3", "CryptoCurrency", "ethereum", "defi", "NFT"],
+    "NFTs": ["NFT", "NFTsMarketplace", "CryptoCurrency", "web3"],
+    "Personal Finance": ["personalfinance", "FinancialPlanning", "povertyfinance", "FIRE", "Bogleheads"],
+    "Investing": ["investing", "StockMarket", "ValueInvesting", "stocks", "finance"],
+    "Stock Market": ["StockMarket", "wallstreetbets", "stocks", "options", "investing"],
+    "Real Estate": ["RealEstate", "realestateinvesting", "FirstTimeHomeBuyer", "landlords"],
+    # Business & Career
+    "Startups": ["startups", "Entrepreneur", "SaaS", "indiehackers", "smallbusiness"],
+    "Entrepreneurship": ["Entrepreneur", "startups", "SaaS", "indiehackers", "smallbusiness"],
+    "SaaS": ["SaaS", "startups", "Entrepreneur", "indiehackers", "microsaas"],
+    "Product Management": ["ProductManagement", "product_design", "startups", "UserExperience"],
+    "Marketing": ["marketing", "digital_marketing", "SEO", "socialmedia", "ContentMarketing"],
+    "Remote Work": ["remotework", "digitalnomad", "WorkOnline", "freelance"],
+    "Career Advice": ["careerguidance", "cscareerquestions", "jobs", "resumes", "interviews"],
+    "Side Hustles": ["sidehustle", "beermoney", "WorkOnline", "Entrepreneur", "passive_income"],
+    "Freelancing": ["freelance", "Upwork", "FreelanceWriters", "webdev"],
+    "E-commerce": ["ecommerce", "shopify", "FulfillmentByAmazon", "dropship"],
+    # Science & Education
+    "Science": ["science", "askscience", "EverythingScience", "Futurology"],
+    "Space": ["space", "SpaceX", "NASA", "Astronomy", "astrophysics"],
+    "Climate & Environment": ["climate", "environment", "ClimateActionPlan", "energy", "renewableenergy"],
+    "Psychology": ["psychology", "neuroscience", "BehavioralEconomics", "mentalhealth"],
+    "Physics": ["Physics", "AskPhysics", "QuantumPhysics", "cosmology"],
+    "Biology": ["biology", "microbiology", "genetics", "Biochemistry"],
+    "History": ["history", "AskHistorians", "HistoryMemes", "ancienthistory"],
+    "Philosophy": ["philosophy", "askphilosophy", "Stoicism", "existentialism"],
+    # Sports
+    "Soccer": ["soccer", "PremierLeague", "football", "Bundesliga", "LaLiga"],
+    "Formula 1": ["formula1", "F1Technical", "MotorsportsReplays"],
+    "Basketball": ["nba", "basketball", "nbadiscussion", "CollegeBasketball"],
+    "American Football": ["nfl", "fantasyfootball", "CFB"],
+    "Cricket": ["Cricket", "IPL", "CricketShitpost"],
+    "Tennis": ["tennis", "10s"],
+    "MMA": ["MMA", "ufc", "bjj", "martialarts"],
+    "Running": ["running", "trailrunning", "marathontraining", "C25K"],
+    "Fitness": ["Fitness", "bodyweightfitness", "GYM", "weightlifting", "StrongLifts5x5"],
+    # Entertainment
+    "Gaming": ["gaming", "Games", "pcgaming", "truegaming", "IndieGaming"],
+    "Movies": ["movies", "MovieSuggestions", "TrueFilm", "Letterboxd", "horror"],
+    "TV Shows": ["television", "NetflixBestOf", "TVSuggestions", "anime"],
+    "Music": ["Music", "hiphopheads", "indieheads", "LetsTalkMusic", "listentothis"],
+    "Anime": ["anime", "manga", "Animesuggest", "animediscussion"],
+    "Books": ["books", "suggestmeabook", "booksuggestions", "literature"],
+    "Podcasts": ["podcasts", "TrueCrimePodcasts", "podcast"],
+    "Photography": ["photography", "photocritique", "itookapicture", "streetphotography"],
+    # Design & Creative
+    "Design": ["design", "graphic_design", "UI_Design", "web_design", "UXDesign"],
+    "UX Design": ["UXDesign", "UserExperience", "userexperience", "UI_Design"],
+    "3D & Animation": ["blender", "3Dmodeling", "Cinema4D", "MotionDesign"],
+    "Art": ["Art", "DigitalArt", "ArtFundamentals", "learnart", "drawing"],
+    "Writing": ["writing", "WritingPrompts", "screenwriting", "selfpublish"],
+    # Lifestyle
+    "Health & Wellness": ["Health", "nutrition", "Fitness", "MedicalNews", "HealthyFood"],
+    "Mental Health": ["mentalhealth", "Anxiety", "depression", "therapy", "selfimprovement"],
+    "Food & Cooking": ["Cooking", "food", "MealPrepSunday", "EatCheapAndHealthy", "recipes"],
+    "Travel": ["travel", "solotravel", "backpacking", "TravelHacks", "digitalnomad"],
+    "Fashion": ["malefashionadvice", "femalefashionadvice", "streetwear", "frugalmalefashion"],
+    "Parenting": ["Parenting", "daddit", "Mommit", "NewParents"],
+    "Pets": ["dogs", "cats", "Pets", "aww", "AnimalsBeingBros"],
+    "Home Improvement": ["HomeImprovement", "DIY", "InteriorDesign", "woodworking"],
+    # News & World
+    "World News": ["worldnews", "news", "geopolitics", "InternationalNews"],
+    "Politics": ["politics", "PoliticalDiscussion", "NeutralPolitics", "geopolitics"],
+    "Economics": ["Economics", "economy", "AskEconomics", "finance"],
+    # Self-Improvement
+    "Productivity": ["productivity", "getdisciplined", "DecidingToBeBetter", "LifeProTips"],
+    "Self Improvement": ["selfimprovement", "DecidingToBeBetter", "getdisciplined", "Stoicism"],
+    "Learning": ["learnprogramming", "languagelearning", "IWantToLearn", "AskAcademia"],
 }
+
+# Build a lowercase lookup from the categories
+TOPIC_SUBREDDIT_MAP: Dict[str, List[str]] = {
+    k.lower(): v for k, v in TOPIC_CATEGORIES.items()
+}
+
+
+def get_all_topics() -> List[Dict[str, str]]:
+    """Return all available topic categories grouped for the UI."""
+    groups = {
+        "Technology & Internet": [
+            "Artificial Intelligence", "Machine Learning", "Programming", "Python",
+            "JavaScript", "Web Development", "Cybersecurity", "Data Science",
+            "DevOps", "Cloud Computing", "Open Source", "Tech News", "Robotics",
+            "Mobile Development",
+        ],
+        "Crypto & Finance": [
+            "Cryptocurrency", "Bitcoin", "Ethereum", "DeFi", "Web3", "NFTs",
+            "Personal Finance", "Investing", "Stock Market", "Real Estate",
+        ],
+        "Business & Career": [
+            "Startups", "Entrepreneurship", "SaaS", "Product Management",
+            "Marketing", "Remote Work", "Career Advice", "Side Hustles",
+            "Freelancing", "E-commerce",
+        ],
+        "Science & Education": [
+            "Science", "Space", "Climate & Environment", "Psychology",
+            "Physics", "Biology", "History", "Philosophy",
+        ],
+        "Sports": [
+            "Soccer", "Formula 1", "Basketball", "American Football",
+            "Cricket", "Tennis", "MMA", "Running", "Fitness",
+        ],
+        "Entertainment": [
+            "Gaming", "Movies", "TV Shows", "Music", "Anime",
+            "Books", "Podcasts", "Photography",
+        ],
+        "Design & Creative": [
+            "Design", "UX Design", "3D & Animation", "Art", "Writing",
+        ],
+        "Lifestyle": [
+            "Health & Wellness", "Mental Health", "Food & Cooking", "Travel",
+            "Fashion", "Parenting", "Pets", "Home Improvement",
+        ],
+        "News & World": [
+            "World News", "Politics", "Economics",
+        ],
+        "Self-Improvement": [
+            "Productivity", "Self Improvement", "Learning",
+        ],
+    }
+    return groups
 
 
 def _rate_limit_state():
