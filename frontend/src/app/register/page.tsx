@@ -37,7 +37,8 @@ export default function RegisterPage() {
 
   const handleOAuth = async (provider: "github" | "google") => {
     try {
-      const redirectUri = `${window.location.origin}/auth/callback?state=${provider}`;
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      localStorage.setItem("oauth_provider", provider);
       const { url } = await getOAuthUrl(provider, redirectUri);
       window.location.href = url;
     } catch {

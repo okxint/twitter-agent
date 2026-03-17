@@ -12,15 +12,16 @@ function CallbackHandler() {
 
   useEffect(() => {
     const code = searchParams.get("code");
-    const state = searchParams.get("state");
-    const provider = (state as "github" | "google") || "github";
+    const storedProvider = localStorage.getItem("oauth_provider");
+    const provider = (storedProvider as "github" | "google") || "github";
 
     if (!code) {
       setError("No authorization code received");
       return;
     }
 
-    const redirectUri = `${window.location.origin}/auth/callback?state=${provider}`;
+    const redirectUri = `${window.location.origin}/auth/callback`;
+    localStorage.removeItem("oauth_provider");
 
     oauthCallback(provider, code, redirectUri)
       .then((res) => {
