@@ -11,10 +11,10 @@ const cards = [
   {
     key: "pending",
     label: "Ready to Use",
-    gradient: "from-amber-500 to-orange-500",
-    bgLight: "bg-amber-50 dark:bg-amber-500/10",
+    accent: "text-amber-500",
+    bg: "bg-amber-50 dark:bg-amber-500/8",
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
@@ -22,10 +22,10 @@ const cards = [
   {
     key: "posted",
     label: "Saved",
-    gradient: "from-green-500 to-emerald-500",
-    bgLight: "bg-green-50 dark:bg-green-500/10",
+    accent: "text-emerald-500",
+    bg: "bg-emerald-50 dark:bg-emerald-500/8",
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     ),
@@ -33,21 +33,21 @@ const cards = [
   {
     key: "totalGenerated",
     label: "Generated",
-    gradient: "from-indigo-500 to-purple-500",
-    bgLight: "bg-indigo-50 dark:bg-indigo-500/10",
+    accent: "text-indigo-500",
+    bg: "bg-indigo-50 dark:bg-indigo-500/8",
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
       </svg>
     ),
   },
   {
     key: "topicsCount",
     label: "Topics",
-    gradient: "from-purple-500 to-pink-500",
-    bgLight: "bg-purple-50 dark:bg-purple-500/10",
+    accent: "text-violet-500",
+    bg: "bg-violet-50 dark:bg-violet-500/8",
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
@@ -58,25 +58,21 @@ export default function StatsCards({ pending, posted, totalGenerated, topicsCoun
   const values: Record<string, number> = { pending, posted, totalGenerated, topicsCount };
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {cards.map((card) => (
         <div
           key={card.key}
-          className="group relative bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 p-5 hover:shadow-lg hover:shadow-gray-100 dark:hover:shadow-slate-900/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
+          className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 p-4 hover:border-zinc-200 dark:hover:border-zinc-700 transition-all"
         >
-          {/* Gradient accent bar */}
-          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${card.gradient}`} />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-slate-400">{card.label}</p>
-              <p className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{values[card.key]}</p>
-            </div>
-            <div className={`${card.bgLight} p-3 rounded-xl`}>
-              <span className={`bg-gradient-to-br ${card.gradient} bg-clip-text text-transparent`}>
-                {card.icon}
-              </span>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[12px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{card.label}</p>
+            <div className={`w-7 h-7 rounded-lg ${card.bg} ${card.accent} flex items-center justify-center`}>
+              {card.icon}
             </div>
           </div>
+          <p className={`text-2xl font-bold ${card.accent}`}>
+            {values[card.key]}
+          </p>
         </div>
       ))}
     </div>

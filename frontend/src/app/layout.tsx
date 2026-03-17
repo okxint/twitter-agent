@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TweetAgent - AI-Powered Twitter Growth on Autopilot",
+  title: "TweetAgent - Reddit trends, your tweets",
   description:
-    "Generate viral tweets with AI, scrape trending content, and grow your Twitter presence on autopilot. Built for creators, founders, and marketers.",
+    "Pick topics you care about. We find what's trending on Reddit and turn it into tweets that sound like you wrote them.",
 };
 
 export default function RootLayout({
