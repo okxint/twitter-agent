@@ -50,8 +50,9 @@ async def trigger_generation(
             hashtags = []
 
         top_posts = await db.get_top_posts(topic_name, limit=20)
+        logger.info(f"Found {len(top_posts)} scraped posts for topic: {topic_name}")
         if not top_posts:
-            logger.warning(f"No scraped posts for topic: {topic_name}")
+            logger.warning(f"No scraped posts for topic: {topic_name} — skipping generation")
             continue
 
         if thread_mode:
@@ -78,6 +79,13 @@ async def trigger_generation(
             total_generated += 1
 
     mode_label = "thread tweets" if thread_mode else "tweets"
+
+    if total_generated == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="No tweets could be generated. Make sure you've scraped Reddit first (click 'Scrape Reddit'), then try generating again.",
+        )
+
     return {
         "generated": total_generated,
         "message": f"Generated {total_generated} {mode_label} across {len(topics)} topics",

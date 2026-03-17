@@ -62,18 +62,25 @@ class ContentGenerator:
             },
         }
 
+        logger.info(f"Calling Gemini API ({self.model})...")
         resp = httpx.post(url, json=payload, timeout=60)
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            logger.error(f"Gemini API returned {resp.status_code}: {resp.text[:500]}")
+            resp.raise_for_status()
         data = resp.json()
 
         # Extract text from Gemini response
         candidates = data.get("candidates", [])
         if not candidates:
-            raise ValueError(f"No candidates in Gemini response: {data}")
+            logger.error(f"No candidates in Gemini response: {json.dumps(data)[:500]}")
+            raise ValueError(f"No candidates in Gemini response")
         parts = candidates[0].get("content", {}).get("parts", [])
         if not parts:
-            raise ValueError(f"No parts in Gemini response: {data}")
-        return parts[0].get("text", "")
+            logger.error(f"No parts in Gemini response candidate: {json.dumps(candidates[0])[:500]}")
+            raise ValueError(f"No parts in Gemini response")
+        text = parts[0].get("text", "")
+        logger.info(f"Gemini returned {len(text)} chars")
+        return text
 
     def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
         """Re-pass a tweet through Gemini to make it sound more natural."""
@@ -132,6 +139,10 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
         try:
             response_text = self._call_gemini(SYSTEM_PROMPT, user_prompt)
             tweet_texts = self._parse_response(response_text)
+            logger.info(f"Parsed {len(tweet_texts)} tweets from Gemini response for topic: {topic}")
+
+            if not tweet_texts:
+                logger.warning(f"Gemini returned no parseable tweets. Raw response: {response_text[:300]}")
 
             inspiration_ids = [p.id for p in top_posts[:10] if p.id]
 
@@ -153,7 +164,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
             return generated
 
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
+            logger.error(f"Tweet generation failed for topic '{topic}': {e}", exc_info=True)
             return []
 
     def generate_thread(
