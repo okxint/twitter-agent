@@ -33,8 +33,8 @@ export default function TopicsPage() {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-          <p className="text-sm text-gray-400 font-medium">Loading topics...</p>
+          <div className="w-7 h-7 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
+          <p className="text-[13px] text-zinc-400 dark:text-zinc-500 font-medium">Loading topics...</p>
         </div>
       </div>
     );
@@ -42,9 +42,9 @@ export default function TopicsPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-gray-900">Topics</h1>
-        <p className="mt-1 text-sm text-gray-500">Define what you want to tweet about. We&apos;ll find the best content.</p>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-white">Topics</h1>
+        <p className="mt-0.5 text-[13px] text-zinc-500 dark:text-zinc-400">Define what you want to tweet about. We&apos;ll find the best content.</p>
       </div>
       <TopicManager topics={topics} onUpdate={loadTopics} />
     </div>

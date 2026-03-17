@@ -12,7 +12,7 @@ function CallbackHandler() {
 
   useEffect(() => {
     const code = searchParams.get("code");
-    const state = searchParams.get("state"); // provider name
+    const state = searchParams.get("state");
     const provider = (state as "github" | "google") || "github";
 
     if (!code) {
@@ -34,10 +34,10 @@ function CallbackHandler() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <a href="/login" className="text-indigo-600 hover:underline">
+          <p className="text-red-500 text-sm mb-4">{error}</p>
+          <a href="/login" className="text-indigo-500 hover:underline text-sm">
             Back to login
           </a>
         </div>
@@ -46,10 +46,10 @@ function CallbackHandler() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600">Signing you in...</p>
+        <div className="w-7 h-7 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Signing you in...</p>
       </div>
     </div>
   );
@@ -59,8 +59,8 @@ export default function AuthCallbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950">
+          <div className="w-7 h-7 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
         </div>
       }
     >
