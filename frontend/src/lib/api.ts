@@ -45,6 +45,14 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    // Treat "User not found" as expired session (DB reset on Render free tier)
+    if (body.detail === "User not found") {
+      clearToken();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      throw new Error("Session expired — please sign in again");
+    }
     throw new Error(body.detail || `Request failed: ${res.status}`);
   }
 
