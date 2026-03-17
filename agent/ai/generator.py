@@ -44,6 +44,7 @@ class ContentGenerator:
         self.model = model
         self.temperature = temperature
         self.tweets_per_topic = tweets_per_topic
+        self._last_error = None
 
     def _call_gemini(self, system: str, user_prompt: str, max_tokens: int = 1024) -> str:
         """Call Gemini API and return text response."""
@@ -164,6 +165,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
             return generated
 
         except Exception as e:
+            self._last_error = str(e)
             logger.error(f"Tweet generation failed for topic '{topic}': {e}", exc_info=True)
             return []
 

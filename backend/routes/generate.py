@@ -83,7 +83,7 @@ async def trigger_generation(
     if total_generated == 0:
         raise HTTPException(
             status_code=422,
-            detail="No tweets could be generated. Make sure you've scraped Reddit first (click 'Scrape Reddit'), then try generating again.",
+            detail=f"No tweets generated. Found {len(top_posts) if 'top_posts' in dir() else 0} scraped posts. Check that your Gemini API key is valid. Last error: {getattr(generator, '_last_error', 'unknown')}",
         )
 
     return {
