@@ -3,9 +3,8 @@ import logging
 import uuid
 from typing import List
 
-import anthropic
+import httpx
 
-from agent.utils.config import ClaudeConfig
 from agent.storage.models import ScrapedPost, GeneratedTweet
 
 logger = logging.getLogger("twitter_agent")
@@ -36,32 +35,61 @@ Rules:
 - Use the specified tone
 - Vary structures across the batch — don't repeat the same hook pattern"""
 
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
 
 class ContentGenerator:
-    def __init__(self, config: ClaudeConfig):
-        self.config = config
-        self.client = anthropic.Anthropic(api_key=config.api_key)
+    def __init__(self, api_key: str, model: str = "gemini-2.0-flash", temperature: float = 0.9, tweets_per_topic: int = 3):
+        self.api_key = api_key
+        self.model = model
+        self.temperature = temperature
+        self.tweets_per_topic = tweets_per_topic
+
+    def _call_gemini(self, system: str, user_prompt: str, max_tokens: int = 1024) -> str:
+        """Call Gemini API and return text response."""
+        url = GEMINI_API_URL.format(model=self.model) + f"?key={self.api_key}"
+
+        payload = {
+            "system_instruction": {
+                "parts": [{"text": system}]
+            },
+            "contents": [
+                {"role": "user", "parts": [{"text": user_prompt}]}
+            ],
+            "generationConfig": {
+                "temperature": self.temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+
+        resp = httpx.post(url, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Extract text from Gemini response
+        candidates = data.get("candidates", [])
+        if not candidates:
+            raise ValueError(f"No candidates in Gemini response: {data}")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            raise ValueError(f"No parts in Gemini response: {data}")
+        return parts[0].get("text", "")
 
     def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
-        """Re-pass a tweet through Claude to make it sound more natural."""
+        """Re-pass a tweet through Gemini to make it sound more natural."""
         try:
-            response = self.client.messages.create(
-                model=self.config.model,
-                max_tokens=400,
-                temperature=0.8,
-                system=(
-                    "Rewrite this tweet to sound like a real person wrote it. "
-                    "Remove any AI-sounding phrases, corporate speak, or filler. "
-                    f"Keep the core message and match this tone: {tone}. "
-                    "Keep under 280 chars. Return ONLY the rewritten tweet, nothing else."
-                ),
-                messages=[{"role": "user", "content": tweet_text}],
+            system = (
+                "Rewrite this tweet to sound like a real person wrote it. "
+                "Remove any AI-sounding phrases, corporate speak, or filler. "
+                f"Keep the core message and match this tone: {tone}. "
+                "Keep under 280 chars. Return ONLY the rewritten tweet, nothing else."
             )
-            result = response.content[0].text.strip().strip('"')
+            result = self._call_gemini(system, tweet_text, max_tokens=400)
+            result = result.strip().strip('"')
             if len(result) > 280:
                 result = result[:277] + "..."
             return result
-        except anthropic.APIError as e:
+        except Exception as e:
             logger.warning(f"Humanize failed, using original: {e}")
             return tweet_text
 
@@ -102,15 +130,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
 ["tweet 1 text here", "tweet 2 text here", "tweet 3 text here"]"""
 
         try:
-            response = self.client.messages.create(
-                model=self.config.model,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-
-            response_text = response.content[0].text
+            response_text = self._call_gemini(SYSTEM_PROMPT, user_prompt)
             tweet_texts = self._parse_response(response_text)
 
             inspiration_ids = [p.id for p in top_posts[:10] if p.id]
@@ -132,8 +152,8 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
             logger.info(f"Generated {len(generated)} tweets for topic: {topic}")
             return generated
 
-        except anthropic.APIError as e:
-            logger.error(f"Claude API error: {e}")
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
             return []
 
     def generate_thread(
@@ -173,15 +193,7 @@ Return ONLY a JSON array of strings in thread order. Example:
 ["1/ Hook tweet here", "2/ Development here", "3/ More detail", "4/ Takeaway"]"""
 
         try:
-            response = self.client.messages.create(
-                model=self.config.model,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-
-            response_text = response.content[0].text
+            response_text = self._call_gemini(SYSTEM_PROMPT, user_prompt)
             tweet_texts = self._parse_response(response_text)
 
             inspiration_ids = [p.id for p in top_posts[:10] if p.id]
@@ -206,8 +218,8 @@ Return ONLY a JSON array of strings in thread order. Example:
             logger.info(f"Generated thread ({len(generated)} tweets) for topic: {topic}")
             return generated
 
-        except anthropic.APIError as e:
-            logger.error(f"Claude API error generating thread: {e}")
+        except Exception as e:
+            logger.error(f"Gemini API error generating thread: {e}")
             return []
 
     def _format_posts_for_analysis(self, posts: List[ScrapedPost]) -> str:
@@ -218,7 +230,7 @@ Return ONLY a JSON array of strings in thread order. Example:
         for i, post in enumerate(sorted_posts[:15], 1):
             entry = (
                 f"#{i} [r/{post.subreddit}] "
-                f"(🔥 virality: {post.engagement_score:.0f} | "
+                f"(virality: {post.engagement_score:.0f} | "
                 f"{post.score} upvotes, {post.num_comments} comments, "
                 f"{post.upvote_ratio:.0%} upvote ratio)\n"
                 f"Title: {post.title}\n"
@@ -233,8 +245,15 @@ Return ONLY a JSON array of strings in thread order. Example:
         return "\n".join(lines)
 
     def _parse_response(self, text: str) -> List[str]:
-        """Parse Claude's response into a list of tweet strings."""
+        """Parse response into a list of tweet strings."""
         text = text.strip()
+
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            lines = text.split("\n")
+            # Remove first and last lines (```json and ```)
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            text = "\n".join(lines).strip()
 
         # Try direct JSON parse
         try:

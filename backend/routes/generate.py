@@ -27,17 +27,15 @@ async def trigger_generation(
     if not topics:
         raise HTTPException(status_code=400, detail="No topics configured. Add topics first.")
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set on server")
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server")
 
-    from agent.utils.config import ClaudeConfig
-    claude_config = ClaudeConfig(
+    generator = ContentGenerator(
         api_key=api_key,
-        model=os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
-        tweets_to_generate=int(os.environ.get("TWEETS_PER_TOPIC", "3")),
+        model=os.environ.get("GEMINI_MODEL", "gemini-2.0-flash"),
+        tweets_per_topic=int(os.environ.get("TWEETS_PER_TOPIC", "3")),
     )
-    generator = ContentGenerator(claude_config)
 
     total_generated = 0
 
@@ -70,7 +68,7 @@ async def trigger_generation(
                 top_posts=top_posts,
                 tone=tone,
                 hashtags=hashtags,
-                count=claude_config.tweets_to_generate,
+                count=generator.tweets_per_topic,
                 humanize=humanize,
             )
 
