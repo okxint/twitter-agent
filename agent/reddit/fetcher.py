@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from typing import List
@@ -20,22 +21,37 @@ class RedditFetcher:
         # Accept but ignore client_id/client_secret for backward compat
         self._last_request = 0.0
 
-    def _rate_limit(self):
-        """Respect ~10 req/min rate limit (6 seconds between requests)."""
+    async def _rate_limit(self):
+        """Respect ~10 req/min rate limit (2 seconds between requests)."""
         elapsed = time.time() - self._last_request
-        if elapsed < 6:
-            time.sleep(6 - elapsed)
+        if elapsed < 2:
+            await asyncio.sleep(2 - elapsed)
         self._last_request = time.time()
 
-    def _get_json(self, url: str) -> dict:
-        """Fetch JSON from Reddit public endpoint."""
-        self._rate_limit()
-        headers = {"User-Agent": USER_AGENT}
-        resp = httpx.get(url, headers=headers, timeout=15, follow_redirects=True)
-        resp.raise_for_status()
-        return resp.json()
+    async def _get_json(self, url: str, retries: int = 2) -> dict:
+        """Fetch JSON from Reddit public endpoint with retry."""
+        for attempt in range(retries + 1):
+            await self._rate_limit()
+            headers = {"User-Agent": USER_AGENT}
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url, headers=headers, timeout=15, follow_redirects=True)
+                    if resp.status_code == 429:
+                        wait = min(10, 3 * (attempt + 1))
+                        logger.warning(f"Reddit 429 rate limit, waiting {wait}s (attempt {attempt + 1})")
+                        await asyncio.sleep(wait)
+                        continue
+                    resp.raise_for_status()
+                    return resp.json()
+            except httpx.TimeoutException:
+                logger.warning(f"Timeout fetching {url} (attempt {attempt + 1})")
+                if attempt < retries:
+                    await asyncio.sleep(2)
+                    continue
+                raise
+        return {}
 
-    def fetch_top_posts(
+    async def fetch_top_posts(
         self,
         subreddit_name: str,
         topic: str,
@@ -47,7 +63,11 @@ class RedditFetcher:
         posts = []
         try:
             url = f"{REDDIT_BASE}/r/{subreddit_name}/top.json?t={time_filter}&limit={limit}"
-            data = self._get_json(url)
+            data = await self._get_json(url)
+
+            if not data:
+                logger.warning(f"Empty response from r/{subreddit_name}")
+                return posts
 
             for child in data.get("data", {}).get("children", []):
                 post_data = child.get("data", {})
@@ -56,8 +76,8 @@ class RedditFetcher:
                 top_comments = []
                 try:
                     comments_url = f"{REDDIT_BASE}{post_data['permalink']}.json?limit={comments_per_post}&sort=best"
-                    comments_data = self._get_json(comments_url)
-                    if len(comments_data) > 1:
+                    comments_data = await self._get_json(comments_url)
+                    if isinstance(comments_data, list) and len(comments_data) > 1:
                         for comment_child in comments_data[1].get("data", {}).get("children", [])[:comments_per_post]:
                             body = comment_child.get("data", {}).get("body", "")
                             if body:
@@ -90,7 +110,7 @@ class RedditFetcher:
 
         return posts
 
-    def fetch_for_topics(
+    async def fetch_for_topics(
         self,
         topics: list,
         posts_per_subreddit: int = 5,
@@ -104,7 +124,7 @@ class RedditFetcher:
             subreddits = topic.get("subreddits", []) if isinstance(topic, dict) else []
 
             for sub in subreddits:
-                posts = self.fetch_top_posts(
+                posts = await self.fetch_top_posts(
                     subreddit_name=sub,
                     topic=topic_name,
                     limit=posts_per_subreddit,

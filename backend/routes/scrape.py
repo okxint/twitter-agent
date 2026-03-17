@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -40,17 +41,21 @@ async def _run_scrape(user_id: int, topics: list):
             _scrape_status[user_id]["message"] = f"Scraping topic: {topic_name}..."
 
             for sub in subreddits:
-                posts = fetcher.fetch_top_posts(
-                    subreddit_name=sub,
-                    topic=topic_name,
-                    limit=5,
-                    time_filter="day",
-                    comments_per_post=3,
-                )
-                if posts:
-                    count = await db.save_scraped_posts(posts)
-                    total_scraped += count
-                    _scrape_status[user_id]["scraped"] = total_scraped
+                try:
+                    _scrape_status[user_id]["message"] = f"Scraping r/{sub} for {topic_name}..."
+                    posts = await fetcher.fetch_top_posts(
+                        subreddit_name=sub,
+                        topic=topic_name,
+                        limit=5,
+                        time_filter="day",
+                        comments_per_post=3,
+                    )
+                    if posts:
+                        count = await db.save_scraped_posts(posts)
+                        total_scraped += count
+                        _scrape_status[user_id]["scraped"] = total_scraped
+                except Exception as e:
+                    logger.warning(f"Failed to scrape r/{sub}: {e}")
 
             topics_processed += 1
 
@@ -71,7 +76,6 @@ async def _run_scrape(user_id: int, topics: list):
 
 @router.post("/scrape")
 async def trigger_scrape(
-    background_tasks: BackgroundTasks,
     user_id: int = Depends(get_current_user_id),
 ):
     from backend.app import db
@@ -97,13 +101,10 @@ async def trigger_scrape(
     if not has_subreddits:
         raise HTTPException(status_code=400, detail="No subreddits configured. Edit your topics to add subreddits.")
 
-    background_tasks.add_task(
-        _run_scrape,
-        user_id=user.id,
-        topics=topics,
-    )
-
     _scrape_status[user_id] = {"running": True, "message": "Starting...", "scraped": 0}
+
+    # Run as async task so it doesn't block the event loop
+    asyncio.create_task(_run_scrape(user_id=user.id, topics=topics))
 
     return {
         "status": "started",

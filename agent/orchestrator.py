@@ -51,7 +51,7 @@ class Orchestrator:
                     client_secret=user.reddit_client_secret,
                 )
 
-                posts = fetcher.fetch_for_topics(
+                posts = await fetcher.fetch_for_topics(
                     topics=user_topics,
                     posts_per_subreddit=self.config.reddit.posts_per_subreddit,
                     time_filter=self.config.reddit.time_filter,
