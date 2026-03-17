@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import uuid
 from typing import List
 
@@ -47,7 +48,7 @@ class ContentGenerator:
         self._last_error = None
 
     def _call_gemini(self, system: str, user_prompt: str, max_tokens: int = 1024) -> str:
-        """Call Gemini API and return text response."""
+        """Call Gemini API with retry on rate limit."""
         url = GEMINI_API_URL.format(model=self.model) + f"?key={self.api_key}"
 
         payload = {
@@ -63,25 +64,35 @@ class ContentGenerator:
             },
         }
 
-        logger.info(f"Calling Gemini API ({self.model})...")
-        resp = httpx.post(url, json=payload, timeout=60)
-        if resp.status_code != 200:
-            logger.error(f"Gemini API returned {resp.status_code}: {resp.text[:500]}")
-            resp.raise_for_status()
-        data = resp.json()
+        max_retries = 3
+        for attempt in range(max_retries):
+            logger.info(f"Calling Gemini API ({self.model}), attempt {attempt + 1}...")
+            resp = httpx.post(url, json=payload, timeout=60)
 
-        # Extract text from Gemini response
-        candidates = data.get("candidates", [])
-        if not candidates:
-            logger.error(f"No candidates in Gemini response: {json.dumps(data)[:500]}")
-            raise ValueError(f"No candidates in Gemini response")
-        parts = candidates[0].get("content", {}).get("parts", [])
-        if not parts:
-            logger.error(f"No parts in Gemini response candidate: {json.dumps(candidates[0])[:500]}")
-            raise ValueError(f"No parts in Gemini response")
-        text = parts[0].get("text", "")
-        logger.info(f"Gemini returned {len(text)} chars")
-        return text
+            if resp.status_code == 429:
+                wait = 15 * (attempt + 1)  # 15s, 30s, 45s
+                logger.warning(f"Gemini rate limit hit, waiting {wait}s before retry...")
+                time.sleep(wait)
+                continue
+
+            if resp.status_code != 200:
+                logger.error(f"Gemini API returned {resp.status_code}: {resp.text[:300]}")
+                raise ValueError(f"Gemini API error ({resp.status_code})")
+
+            data = resp.json()
+
+            candidates = data.get("candidates", [])
+            if not candidates:
+                logger.error(f"No candidates in Gemini response")
+                raise ValueError("Gemini returned empty response")
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                raise ValueError("Gemini returned no content")
+            text = parts[0].get("text", "")
+            logger.info(f"Gemini returned {len(text)} chars")
+            return text
+
+        raise ValueError("Gemini rate limit exceeded after retries. Wait a minute and try again.")
 
     def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
         """Re-pass a tweet through Gemini to make it sound more natural."""

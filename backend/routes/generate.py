@@ -110,10 +110,12 @@ async def trigger_generation(
     mode_label = "thread tweets" if thread_mode else "tweets"
 
     if total_generated == 0:
-        err_detail = f"Last error: {last_error or getattr(generator, '_last_error', 'unknown')}"
+        raw_err = last_error or getattr(generator, '_last_error', 'unknown')
+        # Never leak API keys in error messages
+        safe_err = raw_err.replace(api_key, "***") if api_key else raw_err
         raise HTTPException(
             status_code=422,
-            detail=f"Tweet generation failed. {err_detail}",
+            detail=f"Tweet generation failed. {safe_err}",
         )
 
     return {
