@@ -58,9 +58,22 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(oauth.router, prefix="/api")
 
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s: %(message)s")
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/debug/posts")
+async def debug_posts():
+    """Debug endpoint to check scraped posts in DB."""
+    cursor = await db._db.execute("SELECT topic, COUNT(*) as cnt FROM scraped_posts GROUP BY topic")
+    rows = await cursor.fetchall()
+    topics = {row["topic"]: row["cnt"] for row in rows}
+    total_cursor = await db._db.execute("SELECT COUNT(*) as total FROM scraped_posts")
+    total = (await total_cursor.fetchone())["total"]
+    return {"total_posts": total, "by_topic": topics}
 
 
 # Surface errors in responses during development
