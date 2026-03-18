@@ -82,7 +82,7 @@ async def trigger_generation(
 
         try:
             if thread_mode:
-                generated = generator.generate_thread(
+                generated = await generator.generate_thread(
                     topic=topic_name,
                     top_posts=top_posts,
                     tone=tone,
@@ -90,7 +90,7 @@ async def trigger_generation(
                     humanize=humanize,
                 )
             else:
-                generated = generator.generate_tweets(
+                generated = await generator.generate_tweets(
                     topic=topic_name,
                     top_posts=top_posts,
                     tone=tone,

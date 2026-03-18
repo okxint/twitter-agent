@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -47,7 +48,7 @@ class ContentGenerator:
         self.tweets_per_topic = tweets_per_topic
         self._last_error = None
 
-    def _call_gemini(self, system: str, user_prompt: str, max_tokens: int = 1024) -> str:
+    async def _call_gemini(self, system: str, user_prompt: str, max_tokens: int = 1024) -> str:
         """Call Gemini API with retry on rate limit."""
         url = GEMINI_API_URL.format(model=self.model) + f"?key={self.api_key}"
 
@@ -67,12 +68,13 @@ class ContentGenerator:
         max_retries = 3
         for attempt in range(max_retries):
             logger.info(f"Calling Gemini API ({self.model}), attempt {attempt + 1}...")
-            resp = httpx.post(url, json=payload, timeout=60)
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, json=payload, timeout=60)
 
             if resp.status_code == 429:
-                wait = 15 * (attempt + 1)  # 15s, 30s, 45s
+                wait = 20 * (attempt + 1)  # 20s, 40s, 60s
                 logger.warning(f"Gemini rate limit hit, waiting {wait}s before retry...")
-                time.sleep(wait)
+                await asyncio.sleep(wait)
                 continue
 
             if resp.status_code != 200:
@@ -83,7 +85,6 @@ class ContentGenerator:
 
             candidates = data.get("candidates", [])
             if not candidates:
-                logger.error(f"No candidates in Gemini response")
                 raise ValueError("Gemini returned empty response")
             parts = candidates[0].get("content", {}).get("parts", [])
             if not parts:
@@ -92,9 +93,9 @@ class ContentGenerator:
             logger.info(f"Gemini returned {len(text)} chars")
             return text
 
-        raise ValueError("Gemini rate limit exceeded after retries. Wait a minute and try again.")
+        raise ValueError("Gemini rate limit exceeded. Wait a few minutes and try again.")
 
-    def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
+    async def humanize_tweet(self, tweet_text: str, tone: str = "neutral") -> str:
         """Re-pass a tweet through Gemini to make it sound more natural."""
         try:
             system = (
@@ -103,7 +104,7 @@ class ContentGenerator:
                 f"Keep the core message and match this tone: {tone}. "
                 "Keep under 280 chars. Return ONLY the rewritten tweet, nothing else."
             )
-            result = self._call_gemini(system, tweet_text, max_tokens=400)
+            result = await self._call_gemini(system, tweet_text, max_tokens=400)
             result = result.strip().strip('"')
             if len(result) > 280:
                 result = result[:277] + "..."
@@ -112,7 +113,7 @@ class ContentGenerator:
             logger.warning(f"Humanize failed, using original: {e}")
             return tweet_text
 
-    def generate_tweets(
+    async def generate_tweets(
         self,
         topic: str,
         top_posts: List[ScrapedPost],
@@ -149,7 +150,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
 ["tweet 1 text here", "tweet 2 text here", "tweet 3 text here"]"""
 
         try:
-            response_text = self._call_gemini(SYSTEM_PROMPT, user_prompt)
+            response_text = await self._call_gemini(SYSTEM_PROMPT, user_prompt)
             tweet_texts = self._parse_response(response_text)
             logger.info(f"Parsed {len(tweet_texts)} tweets from Gemini response for topic: {topic}")
 
@@ -163,7 +164,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
                 if len(text) > 280:
                     text = text[:277] + "..."
                 if humanize:
-                    text = self.humanize_tweet(text, tone)
+                    text = await self.humanize_tweet(text, tone)
                 generated.append(
                     GeneratedTweet(
                         topic=topic,
@@ -180,7 +181,7 @@ Return ONLY a JSON array of strings, each string being one tweet. Example:
             logger.error(f"Tweet generation failed for topic '{topic}': {e}", exc_info=True)
             return []
 
-    def generate_thread(
+    async def generate_thread(
         self,
         topic: str,
         top_posts: List[ScrapedPost],
@@ -217,7 +218,7 @@ Return ONLY a JSON array of strings in thread order. Example:
 ["1/ Hook tweet here", "2/ Development here", "3/ More detail", "4/ Takeaway"]"""
 
         try:
-            response_text = self._call_gemini(SYSTEM_PROMPT, user_prompt)
+            response_text = await self._call_gemini(SYSTEM_PROMPT, user_prompt)
             tweet_texts = self._parse_response(response_text)
 
             inspiration_ids = [p.id for p in top_posts[:10] if p.id]
@@ -228,7 +229,7 @@ Return ONLY a JSON array of strings in thread order. Example:
                 if len(text) > 280:
                     text = text[:277] + "..."
                 if humanize:
-                    text = self.humanize_tweet(text, tone)
+                    text = await self.humanize_tweet(text, tone)
                 generated.append(
                     GeneratedTweet(
                         topic=topic,

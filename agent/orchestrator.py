@@ -107,7 +107,7 @@ class Orchestrator:
                 logger.warning(f"No scraped posts for topic: {topic_name}")
                 continue
 
-            generated = self.generator.generate_tweets(
+            generated = await self.generator.generate_tweets(
                 topic=topic_name,
                 top_posts=top_posts,
                 tone=tone,
