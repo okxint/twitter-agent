@@ -6,9 +6,6 @@
 [![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![Claude AI](https://img.shields.io/badge/Claude_AI-8B5CF6?style=flat-square&logo=anthropic&logoColor=white)](https://anthropic.com/)
 
-<!-- TODO: drop a screenshot or demo GIF here -->
-![Dashboard Screenshot](docs/demo.png)
-
 ---
 
 I wanted to grow on Twitter but the "stare at blank tweet box for 20 minutes" workflow wasn't cutting it. Reddit already has amazing discussions happening 24/7 — this app scrapes the good stuff, runs it through Claude to generate original tweets, and lets me approve + post them from a dashboard.
@@ -25,6 +22,51 @@ Pretty simple pipeline:
 4. **You approve and post** — everything sits in a queue. Edit it, approve it, or trash it. Approved tweets go live on Twitter via API v2
 
 The whole point is that the AI does the heavy lifting but you stay in control.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Scheduler (APScheduler)                 │
+│                      Daily automated run                     │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+          ┌───────────▼───────────┐
+          │   Orchestrator        │
+          │   orchestrator.py     │
+          └──────┬────────┬───────┘
+                 │        │
+    ┌────────────▼──┐  ┌──▼──────────────┐
+    │  Reddit        │  │  Claude AI       │
+    │  Scraper       │  │  Generator       │
+    │  (PRAW)        │  │  (Anthropic API) │
+    └────────────┬──┘  └──┬──────────────┘
+                 │         │
+          ┌──────▼─────────▼──────┐
+          │   SQLite Storage       │
+          │   (tweets, topics,     │
+          │    users, settings)    │
+          └──────────┬────────────┘
+                     │
+         ┌───────────┼──────────────┐
+         │           │              │
+┌────────▼──┐ ┌──────▼─────┐ ┌────▼────────┐
+│ FastAPI   │ │  Twitter    │ │  Telegram   │
+│ Backend   │ │  Poster     │ │  Bot        │
+│ (REST)    │ │  (Tweepy)   │ │  (alerts)   │
+└────────┬──┘ └────────────┘ └─────────────┘
+         │
+┌────────▼──────────────┐
+│  Next.js Dashboard    │
+│  (approve / edit /    │
+│   topics / stats)     │
+└───────────────────────┘
+```
+
+**Key design decisions:**
+- **Human-in-the-loop** — no auto-posting by design. AI generates, human approves. Keeps your voice authentic and prevents hallucinated/off-brand tweets.
+- **Per-user API keys** — stored encrypted in SQLite, not env vars. Lets multiple users share one deployment with their own Twitter/Reddit credentials.
+- **Stateless backend** — FastAPI + JWT auth. No sessions. Scales horizontally, deploys to any container platform.
 
 ## Tech stack
 
